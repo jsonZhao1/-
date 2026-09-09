@@ -1,0 +1,44 @@
+name: Build Linux AppImage
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '16'
+
+      - name: Clean up mirror cache
+        run: |
+          rm -f package-lock.json
+          rm -f yarn.lock
+          rm -f .npmrc
+          npm config set registry https://registry.npmjs.org/
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps --loglevel verbose
+
+      - name: Build AppImage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run electron:build -- --linux AppImage
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: electron-builder-output-dir/*.AppImage
