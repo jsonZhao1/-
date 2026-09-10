@@ -5,11 +5,53 @@ const path = window.require('path')
 const { app } = remote
 const electronPath = app.getPath('exe')
 let installRootPath
-if (process.env.NODE_ENV == 'development') {
+if (process.env.NODE_ENV === 'development') {
   // Load the url of the dev server if in development mode
   installRootPath = 'F:\\xiangmu\\zhihuiyun\\electron-example\\electron-example\\'
 } else {
-  installRootPath = path.dirname(electronPath)
+  installRootPath = window.process && window.process.resourcesPath
+    ? path.resolve(window.process.resourcesPath, '..')
+    : path.dirname(electronPath)
+}
+
+const resourcePathFields = ['imgUrl', 'identifierUrl', 'identifierPic', 'sceneUrl']
+
+export function resolveResourcePath(value) {
+  if (!value || typeof value !== 'string') {
+    return value
+  }
+
+  const normalizedValue = value.replace(/\\/g, '/')
+  const lowerValue = normalizedValue.toLowerCase()
+  let relativePath = null
+
+  if (lowerValue.startsWith('video/')) {
+    relativePath = normalizedValue
+  } else {
+    const videoIndex = lowerValue.indexOf('/video/')
+    if (videoIndex !== -1) {
+      relativePath = normalizedValue.slice(videoIndex + 1)
+    }
+  }
+
+  if (!relativePath) {
+    return value
+  }
+
+  return path.join(installRootPath, ...relativePath.split('/'))
+}
+
+function resolveRecordResourcePaths(record) {
+  if (!record) {
+    return record
+  }
+
+  resourcePathFields.forEach(field => {
+    if (record[field]) {
+      record[field] = resolveResourcePath(record[field])
+    }
+  })
+  return record
 }
 
 console.log('Electron 安装路径:', installRootPath)
@@ -18,7 +60,7 @@ ipcRenderer.on('before-quit', (event, message) => {
   // 在这里执行渲染进程需要的操作，比如数据保存等
   db.close()
 })
-export const db = new Dexie('myDatabase')//数据库名称：myDatabase
+export const db = new Dexie('myDatabase')// 数据库名称：myDatabase
 
 db.version(1).stores({
   markClass: '++id, name, imgUrl,enableFlag,status,starTimer', // Primary key and indexed props 对象仓库（objectStore）：friends，唯一的id作为键路径（key path）
@@ -28,15 +70,19 @@ db.version(1).stores({
   topicData: '++id, name,className,identifierDesc,identifierName,identifierUrl,correctTrue,optionSelA,optionSelB,optionSelC,optionSelD,starTimer',
   psd: 'password'
 })
+db.markClass.hook('reading', resolveRecordResourcePaths)
+db.markStudy.hook('reading', resolveRecordResourcePaths)
+db.sceneData.hook('reading', resolveRecordResourcePaths)
+db.topicData.hook('reading', resolveRecordResourcePaths)
+
 db.open()
   .then(() => {
-    console.log('数据库已打开');
+    console.log('数据库已打开')
     // 进行其他数据库操作
-
   })
   .catch(error => {
-    console.error('打开数据库时出错:', error);
-  });
+    console.error('打开数据库时出错:', error)
+  })
 db.on('populate', function() {
   db.sceneData.bulkPut([
     {
