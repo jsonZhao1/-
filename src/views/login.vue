@@ -172,8 +172,11 @@ export default {
       this.$root.$children[0].pay()
       ipcRenderer.send('close-window-request')
     },
-    handleDialogClose() {
-      this.close()
+    handleDialogClose(done) {
+      this.dialogVisible = false
+      if (done) {
+        done()
+      }
     },
     async goToHome() {
       this.$root.$children[0].pay()
