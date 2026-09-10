@@ -21,7 +21,8 @@
         width="30%"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
-        :show-close="false"
+        :show-close="true"
+        :before-close="handleDialogClose"
         top="30vh"
     >
       <el-form :model="ruleForm" :rules="rules" ref="ruleForm" label-width="80px" class="demo-ruleForm">
@@ -170,6 +171,9 @@ export default {
     close() {
       this.$root.$children[0].pay()
       ipcRenderer.send('close-window-request')
+    },
+    handleDialogClose() {
+      this.close()
     },
     async goToHome() {
       this.$root.$children[0].pay()
