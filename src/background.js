@@ -1,6 +1,6 @@
 'use strict'
 
-import { app, protocol, BrowserWindow, ipcMain, screen, session } from 'electron'
+import { app, protocol, BrowserWindow, ipcMain, screen, session, globalShortcut } from 'electron'
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 
 const axios = require('axios')
@@ -14,7 +14,7 @@ const isDevelopment = process.env.NODE_ENV !== 'production'
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'app', privileges: { secure: true, standard: true } }
+  { scheme: 'app', privileges: { secure: true, standard: true, stream: true } }
 ])
 let childWindow
 let secondaryWindow
@@ -60,6 +60,7 @@ async function createWindow() {
   //   win = null
   // });
   win.removeMenu()
+  win.setMenuBarVisibility(false)
   createSecondaryWindow()
   createThirdWindow()
   createFourthWindow()
@@ -72,7 +73,7 @@ async function createWindow() {
     createProtocol('app')
     // Load the index.html when not in development
     const indexPath = path.join(__dirname, 'index.html')
-    win.loadURL(`file://${indexPath}`)
+    win.loadURL(`file://${indexPath}#/`)
   }
   // win.webContents.openDevTools()
   ipcMain.on('window-close', function() {
@@ -89,13 +90,26 @@ async function createWindow() {
 }
 
 function createChildWindow() {
+  if (childWindow && !childWindow.isDestroyed()) {
+    return childWindow
+  }
+  const { bounds } = screen.getPrimaryDisplay()
   childWindow = new BrowserWindow({
-    parent: win,
-    width: 1200,
-    height: 900,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
     show: false,
-    // frame: false,
+    frame: false,
+    kiosk: true,
     fullscreen: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: !process.env.ELECTRON_NODE_INTEGRATION,
@@ -105,6 +119,7 @@ function createChildWindow() {
     }
   })
   childWindow.removeMenu()
+  childWindow.setMenuBarVisibility(false)
   if (process.env.WEBPACK_DEV_SERVER_URL) {
     childWindow.loadURL(process.env.WEBPACK_DEV_SERVER_URL + '#' + '/sysLogin')
     // if (!process.env.IS_TEST) childWindow.webContents.openDevTools()
@@ -116,6 +131,40 @@ function createChildWindow() {
   childWindow.on('closed', () => {
     childWindow = null
   })
+
+  return childWindow
+}
+
+function showChildWindow() {
+  const targetWindow = createChildWindow()
+  const { bounds } = screen.getPrimaryDisplay()
+  targetWindow.setBounds(bounds)
+  targetWindow.setMenuBarVisibility(false)
+  targetWindow.setAlwaysOnTop(true, 'screen-saver')
+  if (!targetWindow.isKiosk()) {
+    targetWindow.setKiosk(true)
+  }
+  if (!targetWindow.isFullScreen()) {
+    targetWindow.setFullScreen(true)
+  }
+  targetWindow.show()
+  targetWindow.focus()
+}
+
+function toggleChildWindow() {
+  if (!childWindow || childWindow.isDestroyed()) {
+    showChildWindow()
+    return
+  }
+
+  if (childWindow.isVisible()) {
+    childWindow.hide()
+    if (win && !win.isDestroyed()) {
+      win.focus()
+    }
+  } else {
+    showChildWindow()
+  }
 }
 
 function createSecondaryWindow() {
@@ -358,11 +407,7 @@ ipcMain.on('close-window-request', () => {
   app.quit()
 })
 ipcMain.on('go-to-sys', () => {
-  if (childWindow.isVisible()) {
-    childWindow.hide()
-  } else {
-    childWindow.show()
-  }
+  toggleChildWindow()
 })
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
@@ -383,6 +428,7 @@ app.on('will-quit', () => {
   // On macOS it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
   // win.send('window-min')
+  globalShortcut.unregisterAll()
 })
 app.on('activate', () => {
   // On macOS it's common to re-create a window in the app when the
@@ -403,7 +449,9 @@ app.on('ready', async() => {
   //   }
   // }
   createWindow()
-  createChildWindow()
+  globalShortcut.register('Alt+w', () => {
+    toggleChildWindow()
+  })
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     details.requestHeaders['SomeHeader'] = 'some value'
     callback({ cancel: false, requestHeaders: details.requestHeaders })
