@@ -110,12 +110,12 @@ export default {
             loading.close()
           } else {
             console.log(loading)
-            this.dialogVisible = true
+            this.dialogVisible = false
             loading.close()
           }
         })
       } else {
-        this.dialogVisible = true
+        this.dialogVisible = false
       }
       // ipcRenderer.on('server-data', (event, data) => {
       //   // 在这里你可以更新界面显示服务端返回的数据
