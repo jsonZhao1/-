@@ -32,15 +32,31 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --loglevel verbose
 
+      - name: Prepare bundled offline Chinese speech
+        run: bash build/prepare-tts.sh
+
       - name: Build Linux packages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run electron:build -- --linux AppImage deb
+        run: npm run electron:build -- --linux AppImage deb --x64
+
+      - name: Test packaged voice offline on glibc 2.31
+        run: |
+          docker pull node:16-bullseye
+          docker run --rm --network none -v "$PWD:/work" -w /work node:16-bullseye node build/smoke-tts.js electron-builder-output-dir/linux-unpacked/resources/tts
+
+      - name: Upload speech sample
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-speech-sample
+          path: tts-smoke-output/*.wav
+          if-no-files-found: error
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
           name: linux-packages
+          if-no-files-found: error
           path: |
             electron-builder-output-dir/*.AppImage
             electron-builder-output-dir/*.deb

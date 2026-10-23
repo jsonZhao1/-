@@ -91,6 +91,7 @@ export default {
     },
     startLinuxTextToSpeech(text) {
       const requestId = this._speechRequestId
+      this._speechLoading = this.$message({ message: '正在生成离线语音，请稍候…', type: 'info', duration: 0 })
       ipcRenderer.invoke('tts-synthesize', text).then(audioData => {
         if (requestId !== this._speechRequestId) {
           return
@@ -113,17 +114,29 @@ export default {
         this._speechAudioUrl = audioUrl
         audio.addEventListener('ended', releaseAudio, { once: true })
         audio.addEventListener('error', releaseAudio, { once: true })
-        return audio.play()
+        return audio.play().catch(error => {
+          releaseAudio()
+          throw new Error('音频播放失败，请检查系统声音输出：' + error.message)
+        })
       }).catch(error => {
         if (requestId !== this._speechRequestId) {
           return
         }
         console.error('Linux text-to-speech failed:', error)
-        this.$message.error('语音播放失败，请安装 espeak-ng 后重新启动应用')
+        this.$message.error((error.message || '语音生成失败').replace(/^Error invoking remote method 'tts-synthesize': Error: /, ''))
+      }).finally(() => {
+        if (requestId === this._speechRequestId && this._speechLoading) {
+          this._speechLoading.close()
+          this._speechLoading = null
+        }
       })
     },
     stopTextToSpeech() {
       this._speechRequestId = (this._speechRequestId || 0) + 1
+      if (this._speechLoading) {
+        this._speechLoading.close()
+        this._speechLoading = null
+      }
       if (this._speechTimer) {
         window.clearTimeout(this._speechTimer)
         this._speechTimer = null

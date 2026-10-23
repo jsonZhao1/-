@@ -9,7 +9,7 @@ const Store = require('electron-store')
 const store = new Store()
 import net from 'net'
 import path from 'path'
-import { spawn } from 'child_process'
+import { createOfflineTts } from './utils/offline-tts'
 // import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer'
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -30,7 +30,7 @@ let thirdWindow
 let fourthWindow
 let win
 let root_path
-let ttsProcess
+let offlineTts
 if (process.env.WEBPACK_DEV_SERVER_URL) {
   // Load the url of the dev server if in development mode
   root_path = process.env.WEBPACK_DEV_SERVER_URL
@@ -316,71 +316,17 @@ ipcMain.on('thirdWindowSend_data', (event, message) => {
 })
 
 ipcMain.handle('tts-synthesize', (event, sourceText) => {
-  return new Promise((resolve, reject) => {
-    if (process.platform !== 'linux') {
-      reject(new Error('Native TTS fallback is only available on Linux'))
-      return
-    }
-
-    const text = typeof sourceText === 'string' ? sourceText.trim() : ''
-    if (!text || text.length > 2000) {
-      reject(new Error('Invalid text for speech synthesis'))
-      return
-    }
-
-    if (ttsProcess && !ttsProcess.killed) {
-      ttsProcess.kill()
-    }
-
-    const chunks = []
-    const errorChunks = []
-    let audioSize = 0
-    let settled = false
-    const child = spawn('espeak-ng', ['--stdout', '-v', 'cmn', '-s', '155', text], {
-      windowsHide: true
-    })
-    ttsProcess = child
-
-    child.stdout.on('data', chunk => {
-      audioSize += chunk.length
-      if (audioSize > 32 * 1024 * 1024) {
-        settled = true
-        child.kill()
-        reject(new Error('Generated speech audio is too large'))
-        return
-      }
-      chunks.push(chunk)
-    })
-    child.stderr.on('data', chunk => errorChunks.push(chunk))
-    child.once('error', error => {
-      if (!settled) {
-        settled = true
-        reject(error)
-      }
-    })
-    child.once('close', code => {
-      if (ttsProcess === child) {
-        ttsProcess = null
-      }
-      if (settled) {
-        return
-      }
-      settled = true
-      if (code === 0 && chunks.length > 0) {
-        resolve(Buffer.concat(chunks))
-        return
-      }
-      const detail = Buffer.concat(errorChunks).toString().trim()
-      reject(new Error(detail || `espeak-ng exited with code ${code}`))
-    })
-  })
+  if (process.platform !== 'linux') throw new Error('离线模型仅用于Linux版本')
+  if (!offlineTts) {
+    offlineTts = createOfflineTts(app.isPackaged
+      ? path.join(process.resourcesPath, 'tts')
+      : path.join(app.getAppPath(), 'build/tts-assets'))
+  }
+  return offlineTts.synthesize(sourceText)
 })
 
 ipcMain.on('tts-stop', () => {
-  if (ttsProcess && !ttsProcess.killed) {
-    ttsProcess.kill()
-  }
-  ttsProcess = null
+  if (offlineTts) offlineTts.stop()
 })
 ipcMain.on('fourthWindowSend_data', (event, message) => {
   console.log(message, '1')
@@ -497,6 +443,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', async(event) => {
+  if (offlineTts) offlineTts.stop()
   if (win) {
     win.webContents.send('before-quit', '应用即将退出，请执行清理操作')
   }
