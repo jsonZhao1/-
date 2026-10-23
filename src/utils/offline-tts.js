@@ -4,6 +4,7 @@ const os = require('os')
 const path = require('path')
 const crypto = require('crypto')
 const { spawn } = require('child_process')
+const { boostSpeech } = require('./speech-volume')
 
 function speechKey(text) {
   return crypto.createHash('sha256').update('aishell3-v1-sid10-rate1\n' + text.trim()).digest('hex')
@@ -20,6 +21,7 @@ function createOfflineTts(root, cacheDir = path.join(os.tmpdir(), 'anquan-speech
   let closed = false
   const cancelled = () => new Error('朗读已取消')
   const remember = (key, audio) => {
+    audio = boostSpeech(audio)
     memory.set(key, audio)
     if (memory.size > 8) memory.delete(memory.keys().next().value)
     return audio

@@ -70,12 +70,13 @@ export default {
     payOne(){
       const audio = document.getElementById('bgmusic');
       // audio.playbackRate = 0.5;
-      audio.volume = 0.5;
+      audio.volume = 0.08;
       audio.play()
     },
     pay(){
       console.log('333')
       let bgmusic2 = document.getElementById('bgmusic2');
+      bgmusic2.volume = 0.15;
       bgmusic2.play();
     }
   }

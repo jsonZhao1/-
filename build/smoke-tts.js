@@ -1,4 +1,5 @@
 const assert = require('assert')
+require('./test-speech-volume')
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
