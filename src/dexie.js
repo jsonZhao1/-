@@ -75,6 +75,26 @@ db.markStudy.hook('reading', resolveRecordResourcePaths)
 db.sceneData.hook('reading', resolveRecordResourcePaths)
 db.topicData.hook('reading', resolveRecordResourcePaths)
 
+// Prepare user-edited/imported descriptions after the transaction commits.
+if (window.require('os').platform() === 'linux') {
+  const prepareSpeech = texts => ipcRenderer.invoke('tts-prepare', texts).catch(console.error)
+  db.markStudy.hook('creating', function(key, record, transaction) {
+    transaction.on('complete', () => prepareSpeech([record.identifierDesc]))
+  })
+  db.markStudy.hook('updating', function(changes, key, record, transaction) {
+    if (Object.prototype.hasOwnProperty.call(changes, 'identifierDesc')) {
+      transaction.on('complete', () => prepareSpeech([changes.identifierDesc]))
+    }
+  })
+  db.on('ready', async() => {
+    const records = await db.markStudy.toArray()
+    // Schedule without delaying database readiness or the UI.
+    for (let i = 0; i < records.length; i += 500) {
+      prepareSpeech(records.slice(i, i + 500).map(record => record.identifierDesc))
+    }
+  })
+}
+
 db.open()
   .then(() => {
     console.log('数据库已打开')

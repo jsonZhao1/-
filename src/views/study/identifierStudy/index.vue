@@ -64,6 +64,9 @@ export default {
         const startIndex = (Number(this.queryParams.pageNum - 1)) * this.queryParams.pageSize
         console.log(startIndex)
         query.offset(startIndex).limit(this.queryParams.pageSize).toArray().then(records => {
+          if (window.require('os').platform() === 'linux') {
+            ipcRenderer.invoke('tts-prepare', records.map(record => record.identifierDesc)).catch(console.error)
+          }
           this.$nextTick(() => {
             this.list = records
           })

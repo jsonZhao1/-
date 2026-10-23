@@ -315,14 +315,25 @@ ipcMain.on('thirdWindowSend_data', (event, message) => {
 
 })
 
-ipcMain.handle('tts-synthesize', (event, sourceText) => {
+function getOfflineTts() {
   if (process.platform !== 'linux') throw new Error('离线模型仅用于Linux版本')
   if (!offlineTts) {
     offlineTts = createOfflineTts(app.isPackaged
       ? path.join(process.resourcesPath, 'tts')
-      : path.join(app.getAppPath(), 'build/tts-assets'))
+      : path.join(app.getAppPath(), 'build/tts-assets'), path.join(app.getPath('userData'), 'speech-cache'))
   }
-  return offlineTts.synthesize(sourceText)
+  return offlineTts
+}
+ipcMain.handle('tts-synthesize', (event, sourceText) => {
+  return getOfflineTts().synthesize(sourceText)
+})
+ipcMain.handle('tts-prepare', async(event, texts) => {
+  if (!Array.isArray(texts) || texts.length > 1000) throw new Error('语音准备列表无效')
+  const tts = getOfflineTts()
+  // Return only status, not all WAV buffers, to the renderer.
+  await Promise.all(texts.filter(text => typeof text === 'string' && text.trim()).map(text =>
+    tts.prepare(text).catch(error => console.warn('Speech preparation:', error.message))))
+  return true
 })
 
 ipcMain.on('tts-stop', () => {
@@ -443,7 +454,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', async(event) => {
-  if (offlineTts) offlineTts.stop()
+  if (offlineTts) offlineTts.close()
   if (win) {
     win.webContents.send('before-quit', '应用即将退出，请执行清理操作')
   }

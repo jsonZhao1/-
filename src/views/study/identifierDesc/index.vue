@@ -23,6 +23,7 @@ export default {
     this.handleInfo()
   },
   beforeDestroy() {
+    this._speechDisposed = true
     this.stopTextToSpeech()
   },
   methods: {
@@ -91,7 +92,12 @@ export default {
     },
     startLinuxTextToSpeech(text) {
       const requestId = this._speechRequestId
-      this._speechLoading = this.$message({ message: '正在生成离线语音，请稍候…', type: 'info', duration: 0 })
+      // Bundled/cached audio is ready immediately; only show feedback on a real miss.
+      this._speechLoadingTimer = window.setTimeout(() => {
+        if (requestId === this._speechRequestId) {
+          this._speechLoading = this.$message({ message: '正在准备新内容的语音…', type: 'info', duration: 0 })
+        }
+      }, 400)
       ipcRenderer.invoke('tts-synthesize', text).then(audioData => {
         if (requestId !== this._speechRequestId) {
           return
@@ -125,6 +131,10 @@ export default {
         console.error('Linux text-to-speech failed:', error)
         this.$message.error((error.message || '语音生成失败').replace(/^Error invoking remote method 'tts-synthesize': Error: /, ''))
       }).finally(() => {
+        if (requestId === this._speechRequestId) {
+          window.clearTimeout(this._speechLoadingTimer)
+          this._speechLoadingTimer = null
+        }
         if (requestId === this._speechRequestId && this._speechLoading) {
           this._speechLoading.close()
           this._speechLoading = null
@@ -133,6 +143,8 @@ export default {
     },
     stopTextToSpeech() {
       this._speechRequestId = (this._speechRequestId || 0) + 1
+      window.clearTimeout(this._speechLoadingTimer)
+      this._speechLoadingTimer = null
       if (this._speechLoading) {
         this._speechLoading.close()
         this._speechLoading = null
@@ -160,6 +172,7 @@ export default {
     handleInfo() {
       this.$root.$children[0].pay()
       this.db.markStudy.get(this.classId).then(record => {
+        if (this._speechDisposed || !record) return
         this.form = record
         this.startTextToSpeech()
         console.log('Found record:', record)
