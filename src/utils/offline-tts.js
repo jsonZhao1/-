@@ -43,7 +43,7 @@ function createOfflineTts(root) {
         '--kokoro-dict-dir=' + path.join(model, 'dict'),
         '--kokoro-lexicon=' + ['lexicon-us-en.txt', 'lexicon-zh.txt'].map(f => path.join(model, f)).join(','),
         '--tts-rule-fsts=' + ['date-zh.fst', 'phone-zh.fst', 'number-zh.fst'].map(f => path.join(model, f)).join(','),
-        '--num-threads=2', '--sid=3', '--speed=1', '--debug=0',
+        '--num-threads=2', '--sid=3', '--kokoro-length-scale=1', '--debug=0',
         '--output-filename=' + output,
         // Leading whitespace prevents text beginning with '-' being parsed as a flag.
         ' ' + text
