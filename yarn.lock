@@ -4183,10 +4183,10 @@ core-js-compat@^3.18.0, core-js-compat@^3.19.0, core-js-compat@^3.6.5:
     browserslist "^4.17.6"
     semver "7.0.0"
 
-core-js@3.25.3:
-  version "3.25.3"
-  resolved "https://registry.npmmirror.com/core-js/-/core-js-3.25.3.tgz"
-  integrity sha512-y1hvKXmPHvm5B7w4ln1S4uc9eV/O5+iFExSRUimnvIph11uaizFR8LFMdONN8hG3P2pipUfX4Y/fR8rAEtcHcQ==
+core-js@3.51.0:
+  version "3.51.0"
+  resolved "https://registry.npmjs.org/core-js/-/core-js-3.51.0.tgz#9a7b197159ab83173b50efbe0c4846bec94b3abb"
+  integrity sha512-7bDKx/5jm5MxzsXxc93g6Z2+4ZsuT/MddrfRmTDJNAkWsYWHU8EVNEsBiIEWnMAMCHMmRfUEjkuo3jeNBOIHRw==
 
 core-js@^2.4.0:
   version "2.6.12"

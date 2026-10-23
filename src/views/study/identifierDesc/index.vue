@@ -2,7 +2,7 @@
 import { videoUrl } from '@/utils/yyh'
 
 const { ipcRenderer } = window.require('electron')
-const speech = new SpeechSynthesisUtterance()
+const isLinux = window.require('os').platform() === 'linux'
 import { getIdentifier } from '@/api/study/identifier'
 
 export default {
@@ -22,12 +22,15 @@ export default {
     console.log(this.pageNum)
     this.handleInfo()
   },
+  beforeDestroy() {
+    this.stopTextToSpeech()
+  },
   methods: {
     toBack() {
       this.$root.$children[0].pay()
       ipcRenderer.send('thirdWindowSend_data', { id: '', index: this.pageNum })
       // videoUrl(this.$root.$children[0].$refs)
-      this.synth.cancel()
+      this.stopTextToSpeech()
       this.$router.replace({
         path: '/study/identifierStudy',
         query: {
@@ -44,10 +47,101 @@ export default {
     startTextToSpeech() {
       this.$root.$children[0].pay()
       // videoUrl(this.$root.$children[0].$refs)
-      if (this.form.identifierDesc != null) {
-        this.synth.cancel()
-        speech.text = this.form.identifierDesc
+      const text = this.form.identifierDesc && this.form.identifierDesc.trim()
+      if (!text) {
+        return
+      }
+      if (!isLinux && (!this.synth || typeof window.SpeechSynthesisUtterance === 'undefined')) {
+        return
+      }
+
+      this.stopTextToSpeech()
+
+      if (isLinux) {
+        this.startLinuxTextToSpeech(text)
+        return
+      }
+
+      // SpeechSynthesisUtterance cannot be reliably reused after cancel() in
+      // Chromium/Electron. Create a fresh utterance for every playback.
+      const speech = new window.SpeechSynthesisUtterance(text)
+      speech.lang = 'zh-CN'
+      speech.rate = 1
+      speech.pitch = 1
+      speech.volume = 1
+
+      const voices = this.synth.getVoices()
+      const chineseVoice = voices.find(voice => /^zh(-|_)/i.test(voice.lang))
+      if (chineseVoice) {
+        speech.voice = chineseVoice
+      }
+
+      this._speechUtterance = speech
+      // Let Chromium finish clearing the cancelled queue before speaking.
+      this._speechTimer = window.setTimeout(() => {
+        if (this._speechUtterance !== speech) {
+          return
+        }
+        if (this.synth.paused) {
+          this.synth.resume()
+        }
         this.synth.speak(speech)
+        this._speechTimer = null
+      }, 80)
+    },
+    startLinuxTextToSpeech(text) {
+      const requestId = this._speechRequestId
+      ipcRenderer.invoke('tts-synthesize', text).then(audioData => {
+        if (requestId !== this._speechRequestId) {
+          return
+        }
+
+        const data = audioData && audioData.type === 'Buffer' ? audioData.data : audioData
+        const audioUrl = window.URL.createObjectURL(new window.Blob([new Uint8Array(data)], {
+          type: 'audio/wav'
+        }))
+        const audio = new window.Audio(audioUrl)
+        const releaseAudio = () => {
+          if (this._speechAudio === audio) {
+            this._speechAudio = null
+            this._speechAudioUrl = null
+          }
+          window.URL.revokeObjectURL(audioUrl)
+        }
+
+        this._speechAudio = audio
+        this._speechAudioUrl = audioUrl
+        audio.addEventListener('ended', releaseAudio, { once: true })
+        audio.addEventListener('error', releaseAudio, { once: true })
+        return audio.play()
+      }).catch(error => {
+        if (requestId !== this._speechRequestId) {
+          return
+        }
+        console.error('Linux text-to-speech failed:', error)
+        this.$message.error('语音播放失败，请安装 espeak-ng 后重新启动应用')
+      })
+    },
+    stopTextToSpeech() {
+      this._speechRequestId = (this._speechRequestId || 0) + 1
+      if (this._speechTimer) {
+        window.clearTimeout(this._speechTimer)
+        this._speechTimer = null
+      }
+      this._speechUtterance = null
+      if (this.synth) {
+        this.synth.cancel()
+      }
+      if (this._speechAudio) {
+        this._speechAudio.pause()
+        this._speechAudio = null
+      }
+      if (this._speechAudioUrl) {
+        window.URL.revokeObjectURL(this._speechAudioUrl)
+        this._speechAudioUrl = null
+      }
+      if (isLinux) {
+        ipcRenderer.send('tts-stop')
       }
     },
     handleInfo() {
