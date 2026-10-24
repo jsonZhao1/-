@@ -68,7 +68,7 @@ for (const [platform, mainX, mainY] of [
     assert.strictEqual(admin.options.y, mainY)
     assert.strictEqual(admin.options.parent, mainWindow)
     assert.strictEqual(admin.options.skipTaskbar, false)
-    assert.strictEqual(admin.options.frame, true)
+    assert.strictEqual(admin.options.frame, false)
     assert.strictEqual(admin.maximized, true)
     assert.strictEqual(admin.top, false)
     assert.strictEqual(admin.kiosk, false)

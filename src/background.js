@@ -115,7 +115,7 @@ function createChildWindow() {
     width: bounds.width,
     height: bounds.height,
     show: false,
-    frame: linuxDesktop,
+    frame: false,
     kiosk: !linuxDesktop,
     fullscreen: !linuxDesktop,
     alwaysOnTop: !linuxDesktop,
