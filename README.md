@@ -1,5 +1,14 @@
 # 文档
 
+## 麒麟 UKUI 文件选择兼容（4.4.2）
+
+Linux 管理后台改为普通最大化窗口，保留系统标题栏和任务栏入口，
+不再开启 kiosk、全屏或 always-on-top，避免遮挡 UKUI 的系统文件选择框。
+前台学习界面仍保持原来的全屏显示。此调整覆盖后台图片选择和文件导入。
+回归检查：`node build/test-admin-window.js`。
+目标系统验收：新增分类选择图片、取消选择、修改图片、导入 Excel、
+隐藏后重新打开后台。需要在实际麒麟 UKUI 桌面验证窗口切换和鼠标输入。
+
 https://git.xios.club/xios/public/src/branch/master/%e5%bc%80%e5%8f%91/electron-vue/electron%e5%bf%ab%e9%80%9f%e5%bc%80%e5%a7%8b.md
 
 ## 国产 Linux 离线中文朗读（4.4.1）

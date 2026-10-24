@@ -102,22 +102,26 @@ function createChildWindow() {
   if (childWindow && !childWindow.isDestroyed()) {
     return childWindow
   }
-  const { bounds } = screen.getPrimaryDisplay()
+  const linuxDesktop = process.platform === 'linux'
+  const display = screen.getPrimaryDisplay()
+  const bounds = linuxDesktop ? display.workArea : display.bounds
   childWindow = new BrowserWindow({
+    // Keep the admin above our main window without covering UKUI's portal.
+    parent: linuxDesktop ? win : undefined,
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
     show: false,
-    frame: false,
-    kiosk: true,
-    fullscreen: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
+    frame: linuxDesktop,
+    kiosk: !linuxDesktop,
+    fullscreen: !linuxDesktop,
+    alwaysOnTop: !linuxDesktop,
+    skipTaskbar: !linuxDesktop,
+    resizable: linuxDesktop,
+    movable: linuxDesktop,
+    minimizable: linuxDesktop,
+    maximizable: linuxDesktop,
     autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: true,
@@ -146,15 +150,22 @@ function createChildWindow() {
 
 function showChildWindow() {
   const targetWindow = createChildWindow()
-  const { bounds } = screen.getPrimaryDisplay()
-  targetWindow.setBounds(bounds)
   targetWindow.setMenuBarVisibility(false)
-  targetWindow.setAlwaysOnTop(true, 'screen-saver')
-  if (!targetWindow.isKiosk()) {
-    targetWindow.setKiosk(true)
-  }
-  if (!targetWindow.isFullScreen()) {
-    targetWindow.setFullScreen(true)
+  if (process.platform === 'linux') {
+    // UKUI runs file choosers in xdg-desktop-portal-ukui, outside Electron.
+    // Kiosk/fullscreen + always-on-top can prevent that window receiving input.
+    // Apply this on every reopen as well as initial creation.
+    targetWindow.setKiosk(false)
+    targetWindow.setFullScreen(false)
+    targetWindow.setAlwaysOnTop(false)
+    if (targetWindow.isMinimized()) targetWindow.restore()
+    targetWindow.maximize()
+  } else {
+    const { bounds } = screen.getPrimaryDisplay()
+    targetWindow.setBounds(bounds)
+    targetWindow.setAlwaysOnTop(true, 'screen-saver')
+    if (!targetWindow.isKiosk()) targetWindow.setKiosk(true)
+    if (!targetWindow.isFullScreen()) targetWindow.setFullScreen(true)
   }
   targetWindow.show()
   targetWindow.focus()
