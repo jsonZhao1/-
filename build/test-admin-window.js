@@ -7,7 +7,10 @@ const start = source.indexOf('function createChildWindow()')
 const end = source.indexOf('function createSecondaryWindow()', start)
 assert(start !== -1 && end > start)
 
-for (const platform of ['linux', 'win32']) {
+for (const [platform, mainX, mainY] of [
+  ['linux', 0, 0], ['linux', 1920, 0], ['linux', -1920, 0],
+  ['linux', 0, -1080], ['win32', 0, 0]
+]) {
   const windows = []
   class FakeWindow {
     constructor(options) {
@@ -23,6 +26,7 @@ for (const platform of ['linux', 'win32']) {
     loadURL() {}
     on() {}
     isDestroyed() { return false }
+    getBounds() { return this.bounds }
     setBounds(bounds) { this.bounds = bounds }
     setAlwaysOnTop(value) { this.top = value }
     setKiosk(value) { this.kiosk = value }
@@ -38,18 +42,30 @@ for (const platform of ['linux', 'win32']) {
     focus() { this.focused = true }
   }
   const mainWindow = new FakeWindow({})
+  mainWindow.bounds = { x: mainX, y: mainY, width: 1920, height: 1080 }
   const context = vm.createContext({
     process: { platform, env: {} }, BrowserWindow: FakeWindow,
     win: mainWindow, __dirname: '/app',
-    screen: { getPrimaryDisplay: () => ({
-      bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-      workArea: { x: 0, y: 0, width: 1920, height: 1040 }
-    }) }
+    screen: {
+      getPrimaryDisplay: () => ({
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        workArea: { x: 0, y: 0, width: 1920, height: 1040 }
+      }),
+      getDisplayMatching: bounds => {
+        assert.strictEqual(bounds, mainWindow.bounds)
+        return {
+          bounds: mainWindow.bounds,
+          workArea: { x: mainX, y: mainY, width: 1920, height: 1040 }
+        }
+      }
+    }
   })
   vm.runInContext('let childWindow;\n' + source.slice(start, end), context)
   context.showChildWindow()
   const admin = windows[1]
   if (platform === 'linux') {
+    assert.strictEqual(admin.options.x, mainX)
+    assert.strictEqual(admin.options.y, mainY)
     assert.strictEqual(admin.options.parent, mainWindow)
     assert.strictEqual(admin.options.skipTaskbar, false)
     assert.strictEqual(admin.options.frame, true)
@@ -74,5 +90,5 @@ for (const platform of ['linux', 'win32']) {
     assert.strictEqual(admin.fullscreen, true)
     assert.strictEqual(admin.options.frame, false)
   }
-  console.log(platform + ': admin creation and reopen checks passed')
+  console.log(`${platform} main display (${mainX}, ${mainY}): admin creation and reopen checks passed`)
 }

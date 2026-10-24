@@ -103,7 +103,9 @@ function createChildWindow() {
     return childWindow
   }
   const linuxDesktop = process.platform === 'linux'
-  const display = screen.getPrimaryDisplay()
+  const display = linuxDesktop && win && !win.isDestroyed()
+    ? screen.getDisplayMatching(win.getBounds())
+    : screen.getPrimaryDisplay()
   const bounds = linuxDesktop ? display.workArea : display.bounds
   childWindow = new BrowserWindow({
     // Keep the admin above our main window without covering UKUI's portal.
